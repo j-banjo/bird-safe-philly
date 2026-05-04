@@ -1,16 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bird Collision Analysis Dashboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
-
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3-dsv@3"></script>
 
   <style>
     :root {
@@ -31,78 +29,117 @@
 
     body {
       margin: 0;
-      font-family: Arial, sans-serif;
+      height: 100vh;
+      overflow: hidden;
+      font-family: Poppins, Arial, sans-serif;
       background: var(--bg);
       color: var(--text);
+    }
+
+    #app {
       height: 100vh;
       display: grid;
       grid-template-rows: auto auto minmax(0, 1fr);
-      overflow: hidden;
     }
 
     header {
-      padding: 12px 16px;
+      padding: 8px 16px;
       background: var(--panel);
       border-bottom: 2px solid var(--primary);
+      display: flex;
+      align-items: center;
+    }
+
+    header img {
+      height: 64px;
+      margin-right: 12px;
     }
 
     h1 {
       margin: 0;
-      font-size: 26px;
+      font-size: 28px;
+      color: var(--text);
     }
 
-    header p {
-      margin: 4px 0 0 0;
-      color: var(--muted);
+    .subtitle {
+      margin: 0;
       font-size: 13px;
+      color: var(--muted);
     }
 
-    .filters {
+    #filters {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+      grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
       gap: 14px;
       align-items: end;
       padding: 12px 14px;
       background: var(--panel);
       border-bottom: 1px solid var(--border);
+      min-height: 76px;
+      z-index: 2500;
+    }
+
+    .filter-group {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
     }
 
     label {
-      display: block;
       font-size: 12px;
       font-weight: 700;
       color: var(--secondary);
       text-transform: uppercase;
       letter-spacing: 0.04em;
-      margin-bottom: 4px;
     }
 
     select,
-    input,
-    button {
-      width: 100%;
-      height: 38px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 0 10px;
-      background: #ffffff;
-      color: var(--text);
-    }
+	input[type="date"] {
+		height: 38px;
+		width: 100%;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		padding: 0 8px;
+		background: #ffffff;
+		color: var(--text);
+		font-family: inherit;
+		min-width: 0;
+	}
+
+input[type="radio"] {
+  width: auto;
+  height: auto;
+  margin: 0 4px 0 0;
+  padding: 0;
+  accent-color: var(--primary);
+}
 
     button {
+      height: 38px;
+      padding: 0 16px;
       border: none;
+      border-radius: 8px;
       background: var(--primary);
       color: #ffffff;
       font-weight: 700;
       cursor: pointer;
       white-space: nowrap;
+      font-family: inherit;
     }
 
-    main {
+    #main {
       display: grid;
-      grid-template-columns: 280px minmax(0, 1fr) 320px;
+      grid-template-columns: 280px 0.9fr 0.7fr;
       gap: 12px;
       padding: 12px;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .left-col {
+      display: grid;
+      grid-template-rows: 1fr 1fr;
+      gap: 12px;
       min-height: 0;
     }
 
@@ -111,15 +148,19 @@
       border: 1px solid var(--border);
       border-radius: 10px;
       padding: 12px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
-      min-height: 0;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.04);
       overflow: hidden;
+      min-height: 0;
     }
 
-    .stack {
-      display: grid;
-      grid-template-rows: 1fr 1fr;
-      gap: 12px;
+    .card h3 {
+      margin: 0 0 10px 0;
+      color: var(--secondary);
+    }
+
+    .map-card {
+      display: flex;
+      flex-direction: column;
       min-height: 0;
     }
 
@@ -131,30 +172,81 @@
       border-bottom: 1px solid var(--border);
     }
 
-    .panel-header h2,
-    .card h2 {
+    .panel-header h3 {
       margin: 0;
-      font-size: 18px;
+      font-weight: 700;
     }
 
     .panel-header p {
       margin: 4px 0 0 0;
       color: var(--muted);
-      font-size: 13px;
+    }
+
+    #map-wrap {
+      position: relative;
+      flex: 1;
+      min-height: 0;
     }
 
     #map {
-      height: calc(100% - 64px);
-      min-height: 300px;
+      height: 100%;
+      width: 100%;
       border-radius: 8px;
     }
 
-    .stat {
+	#layer-toggle {
+		position: absolute;
+		top: 10px;
+		right: 10px;
+		z-index: 1200;
+		background: rgba(255,255,255,0.96);
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+		padding: 7px 9px;
+		font-size: 12px;
+		font-weight: 700;
+		line-height: 1;
+	}
+
+	#layer-toggle label {
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		margin-right: 8px;
+		cursor: pointer;
+		text-transform: none;
+		letter-spacing: 0;
+		font-size: 12px;
+		line-height: 1;
+	}
+
+	#right-toggle {
+		border-bottom: 1px solid var(--border);
+		padding-bottom: 8px;
+		margin-bottom: 10px;
+		font-size: 12px;
+		font-weight: 700;
+		line-height: 1;
+	}
+
+	#right-toggle label {
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		margin-right: 10px;
+		cursor: pointer;
+		text-transform: none;
+		letter-spacing: 0;
+		font-size: 12px;
+		line-height: 1;
+	}
+
+    .stat-card {
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 10px;
+      padding: 8px;
       background: #fcfcfc;
-      margin-bottom: 10px;
     }
 
     .stat-label {
@@ -169,367 +261,642 @@
       font-size: 20px;
       font-weight: 700;
       color: var(--primary);
-      margin-top: 4px;
+      margin-top: 3px;
     }
 
-    .muted {
+    #stats-panel {
+      display: grid;
+      gap: 10px;
+    }
+
+    .two-stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    #selected-collision-panel, #graph-panel, #cesium-panel {
       color: var(--muted);
       font-size: 14px;
       line-height: 1.45;
     }
 
-    @media (max-width: 900px) {
-      body {
-        overflow: auto;
-        height: auto;
-      }
+    .detail-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 4px;
+    }
 
-      .filters,
-      main {
-        grid-template-columns: 1fr;
-      }
+    .detail-row {
+      font-size: 13px;
+      margin-bottom: 4px;
+      color: var(--text);
+    }
 
-      main {
-        min-height: 900px;
-      }
+    .hidden {
+      display: none;
+    }
 
-      .stack {
-        grid-template-rows: auto auto;
-      }
-
-      #map {
-        height: 520px;
-      }
+    .leaflet-popup-content {
+      font-family: Poppins, Arial, sans-serif;
+      font-size: 13px;
+      line-height: 1.4;
     }
   </style>
 </head>
 
 <body>
-  <header>
-    <h1>Bird Collision Analysis Dashboard</h1>
-    <p>Static GitHub Pages smoke test for bird-building collision observations</p>
-  </header>
+  <div id="app">
+    <header>
+      <img src="assets/logo.avif" onerror="this.style.display='none'" />
+      <div>
+        <h1>Bird Collision Analysis Dashboard</h1>
+        <p class="subtitle">Interactive exploration of bird-building collisions</p>
+      </div>
+    </header>
 
-  <section class="filters">
-    <div>
-      <label for="species-filter">Species</label>
-      <select id="species-filter">
-        <option value="">All species</option>
-      </select>
-    </div>
-
-    <div>
-      <label for="status-filter">Status</label>
-      <select id="status-filter">
-        <option value="">All statuses</option>
-      </select>
-    </div>
-
-    <div>
-      <label for="building-filter">Building</label>
-      <select id="building-filter">
-        <option value="">All buildings</option>
-      </select>
-    </div>
-
-    <div>
-      <label for="date-filter">Start date</label>
-      <input id="date-filter" type="date" />
-    </div>
-
-    <button id="clear-filters">Clear filters</button>
-  </section>
-
-  <main>
-    <section class="stack">
-      <div class="card">
-        <h2>Dashboard Summary</h2>
-        <div id="stats-panel" style="margin-top: 12px;"></div>
+    <section id="filters">
+      <div class="filter-group">
+        <label>Species</label>
+        <select id="species-filter"></select>
       </div>
 
-      <div class="card">
-        <h2>Selected Collision</h2>
-        <div id="selected-panel" class="muted" style="margin-top: 12px;">
-          Click a collision point to inspect details.
-        </div>
+		<div class="filter-group">
+			<label>Date range</label>
+		<div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+			<input id="start-date" type="date" />
+			<input id="end-date" type="date" />
+		</div>
+	</div>
+
+      <div class="filter-group">
+        <label>Status</label>
+        <select id="status-filter"></select>
       </div>
+
+      <div class="filter-group">
+        <label>Condition</label>
+        <select id="condition-filter"></select>
+      </div>
+
+      <div class="filter-group">
+        <label>Building</label>
+        <select id="building-filter"></select>
+      </div>
+
+      <button id="clear-filters">Clear filters</button>
     </section>
 
-    <section class="card">
-      <div class="panel-header">
-        <h2>Collision Map</h2>
-        <p>Filtered bird-building collision observations</p>
-      </div>
-      <div id="map"></div>
-    </section>
-
-    <section class="stack">
-      <div class="card">
-        <h2>Graph Panel</h2>
-        <div id="graph-panel" class="muted" style="margin-top: 12px;">
-          Static test panel. Graphs can be added with Plotly.js later.
+    <main id="main">
+      <section class="left-col">
+        <div class="card">
+          <h3>Dashboard Summary</h3>
+          <div id="stats-panel"></div>
         </div>
-      </div>
 
-      <div class="card">
-        <h2>3D Building View</h2>
-        <div class="muted" style="margin-top: 12px;">
-          Static test panel. Cesium can be added later, but this confirms the GitHub Pages structure first.
+        <div class="card">
+          <h3>Selected Collision</h3>
+          <div id="selected-collision-panel">Click a collision point to inspect details.</div>
         </div>
-      </div>
-    </section>
-  </main>
+      </section>
+
+      <section class="card map-card">
+        <div class="panel-header">
+          <h3>Collision Map</h3>
+          <p>Filtered bird-building collision observations</p>
+        </div>
+
+        <div id="map-wrap">
+          <div id="map"></div>
+          <div id="layer-toggle">
+            <label><input type="radio" name="layer-mode" value="collisions" checked /> Collisions</label>
+            <label><input type="radio" name="layer-mode" value="buildings" /> Buildings</label>
+            <label><input type="radio" name="layer-mode" value="both" /> Both</label>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" id="right-panel">
+        <div id="right-toggle">
+          <label><input type="radio" name="right-mode" value="stats" checked /> Building Statistics</label>
+          <label><input type="radio" name="right-mode" value="cesium" /> 3D Building View</label>
+        </div>
+
+        <div id="building-statistics-view">
+          <div id="graph-panel">Select a building or click a collision point to view building-level outcomes.</div>
+        </div>
+
+        <div id="cesium-view" class="hidden">
+          <h3>3D Building View</h3>
+          <div id="cesium-panel">Coming soon!</div>
+        </div>
+      </section>
+    </main>
+  </div>
 
   <script>
-    const map = L.map("map").setView([39.9526, -75.1652], 12);
+    const THEME = {
+      bg: "#fcfcfc",
+      panel: "#ffffff",
+      border: "#e3e8ee",
+      text: "#011f3e",
+      muted: "#5c6b7a",
+      primary: "#034485",
+      secondary: "#011f3e",
+      accent: "#f7c447",
+      danger: "#e94f37"
+    };
+
+    let collisions = [];
+    let buildings = [];
+    let ndviRows = [];
+    let collisionLayer = L.layerGroup();
+    let buildingLayer = L.layerGroup();
+    let currentLayerMode = "collisions";
+
+    const buildingColors = ["#292f56", "#4f3550", "#763c4a", "#9c4243", "#c3493d", "#e94f37"];
+
+    const DEFAULT_CENTER = [39.9526, -75.1652];
+    const DEFAULT_ZOOM = 13;
+    const map = L.map("map", { maxZoom: 22 }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 
     L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+      maxZoom: 22,
+      maxNativeZoom: 20,
       attribution: "&copy; OpenStreetMap contributors &copy; CARTO"
     }).addTo(map);
 
-    const markerLayer = L.layerGroup().addTo(map);
+    collisionLayer.addTo(map);
 
-    let allFeatures = [];
-
-    const speciesFilter = document.getElementById("species-filter");
-    const statusFilter = document.getElementById("status-filter");
-    const buildingFilter = document.getElementById("building-filter");
-    const dateFilter = document.getElementById("date-filter");
-    const clearButton = document.getElementById("clear-filters");
-    const statsPanel = document.getElementById("stats-panel");
-    const selectedPanel = document.getElementById("selected-panel");
-
-    function cleanValue(value) {
-      if (value === null || value === undefined || value === "nan") {
-        return "";
-      }
-
-      return String(value);
-    }
-
-    function getBuildingLabel(properties) {
-      return cleanValue(properties.building_name) || cleanValue(properties.building_id) || "Unknown building";
+    function cleanValue(value, fallback = "N/A") {
+      if (value === null || value === undefined || value === "" || value === "nan") return fallback;
+      return value;
     }
 
     function uniqueSorted(values) {
-      return [...new Set(values.filter(value => value !== ""))].sort();
+      return [...new Set(values.filter(v => v !== null && v !== undefined && v !== "" && v !== "nan"))].sort();
     }
 
-    function populateSelect(select, values, defaultLabel) {
-      const currentValue = select.value;
-      select.innerHTML = "";
+    function fillSelect(id, values, allLabel) {
+      const el = document.getElementById(id);
+      const current = el.value;
+      el.innerHTML = "";
+      const all = document.createElement("option");
+      all.value = "";
+      all.textContent = allLabel;
+      el.appendChild(all);
 
-      const defaultOption = document.createElement("option");
-      defaultOption.value = "";
-      defaultOption.textContent = defaultLabel;
-      select.appendChild(defaultOption);
-
-      values.forEach(value => {
+      values.forEach(v => {
         const option = document.createElement("option");
-        option.value = value;
-        option.textContent = value;
-        select.appendChild(option);
+        option.value = v;
+        option.textContent = v;
+        el.appendChild(option);
       });
 
-      if (values.includes(currentValue)) {
-        select.value = currentValue;
+      if (values.includes(current)) el.value = current;
+    }
+
+    function getBuildingLabel(props) {
+      return cleanValue(props.building_name, String(cleanValue(props.building_id, "")));
+    }
+
+    function getCollisionBuildingLabel(props) {
+      return cleanValue(props.building_name, String(cleanValue(props.building_id, "")));
+    }
+
+    function getBuildingColor(value, breaks) {
+      const v = Number(value);
+      if (Number.isNaN(v)) return "transparent";
+      if (v <= breaks[1]) return buildingColors[0];
+      if (v <= breaks[2]) return buildingColors[1];
+      if (v <= breaks[3]) return buildingColors[2];
+      if (v <= breaks[4]) return buildingColors[3];
+      if (v <= breaks[5]) return buildingColors[4];
+      return buildingColors[5];
+    }
+
+    function randomPalette(n, saturation = 58, lightness = 48) {
+      const colors = [];
+      let hue = 0.08;
+      const goldenRatio = 0.61803398875;
+
+      for (let i = 0; i < n; i++) {
+        hue = (hue + goldenRatio) % 1;
+        colors.push(`hsl(${Math.round(hue * 360)}, ${saturation}%, ${lightness}%)`);
       }
+
+      return colors;
     }
 
-    function initializeFilters(features) {
-      const speciesValues = uniqueSorted(
-        features.map(feature => cleanValue(feature.properties.species_name))
-      );
-
-      const statusValues = uniqueSorted(
-        features.map(feature => cleanValue(feature.properties.dead_or_alive))
-      );
-
-      const buildingValues = uniqueSorted(
-        features.map(feature => getBuildingLabel(feature.properties))
-      );
-
-      populateSelect(speciesFilter, speciesValues, "All species");
-      populateSelect(statusFilter, statusValues, "All statuses");
-      populateSelect(buildingFilter, buildingValues, "All buildings");
+    function countBy(rows, field, fallback = "Unknown") {
+      const counts = {};
+      rows.forEach(row => {
+        const key = cleanValue(row.properties[field], fallback);
+        counts[key] = (counts[key] || 0) + 1;
+      });
+      return counts;
     }
 
-    function filterFeatures() {
-      const species = speciesFilter.value;
-      const status = statusFilter.value;
-      const building = buildingFilter.value;
-      const startDate = dateFilter.value;
-
-      return allFeatures.filter(feature => {
-        const properties = feature.properties;
-
-        const featureSpecies = cleanValue(properties.species_name);
-        const featureStatus = cleanValue(properties.dead_or_alive);
-        const featureBuilding = getBuildingLabel(properties);
-        const featureDate = cleanValue(properties.time_observed);
-
-        if (species && featureSpecies !== species) {
-          return false;
-        }
-
-        if (status && featureStatus !== status) {
-          return false;
-        }
-
-        if (building && featureBuilding !== building) {
-          return false;
-        }
-
-        if (startDate && featureDate && featureDate < startDate) {
-          return false;
-        }
-
-        return true;
-      });
+    function topEntries(counts, n) {
+      return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, n);
     }
 
-    function updateStats(features) {
-      const speciesSet = new Set(
-        features.map(feature => cleanValue(feature.properties.species_name)).filter(Boolean)
-      );
-
-      const buildingSet = new Set(
-        features.map(feature => getBuildingLabel(feature.properties)).filter(Boolean)
-      );
-
-      const speciesCounts = {};
-
-      features.forEach(feature => {
-        const species = cleanValue(feature.properties.species_name);
-
-        if (species) {
-          speciesCounts[species] = (speciesCounts[species] || 0) + 1;
-        }
-      });
-
-      let mostCommonSpecies = "N/A";
-      let maxCount = 0;
-
-      Object.entries(speciesCounts).forEach(([species, count]) => {
-        if (count > maxCount) {
-          mostCommonSpecies = species;
-          maxCount = count;
-        }
-      });
-
-      statsPanel.innerHTML = `
-        <div class="stat">
-          <div class="stat-label">Filtered records</div>
-          <div class="stat-value">${features.length.toLocaleString()}</div>
-        </div>
-
-        <div class="stat">
-          <div class="stat-label">Unique species</div>
-          <div class="stat-value">${speciesSet.size.toLocaleString()}</div>
-        </div>
-
-        <div class="stat">
-          <div class="stat-label">Unique buildings</div>
-          <div class="stat-value">${buildingSet.size.toLocaleString()}</div>
-        </div>
-
-        <div class="stat">
-          <div class="stat-label">Most common species</div>
-          <div class="stat-value">${mostCommonSpecies}</div>
+    function statCard(label, value) {
+      return `
+        <div class="stat-card">
+          <div class="stat-label">${label}</div>
+          <div class="stat-value">${value}</div>
         </div>
       `;
     }
 
-    function renderMarkers(features) {
-      markerLayer.clearLayers();
+    function applyFilters() {
+      const species = document.getElementById("species-filter").value;
+      const status = document.getElementById("status-filter").value;
+      const condition = document.getElementById("condition-filter").value;
+      const building = document.getElementById("building-filter").value;
+      const startDate = document.getElementById("start-date").value;
+      const endDate = document.getElementById("end-date").value;
 
-      const bounds = [];
+      let filtered = collisions.filter(f => {
+        const p = f.properties;
+        const date = cleanValue(p.time_observed, "");
+
+        if (species && p.species_name !== species) return false;
+        if (status && p.dead_or_alive !== status) return false;
+        if (condition && p.condition !== condition) return false;
+        if (building && getCollisionBuildingLabel(p) !== building) return false;
+        if (startDate && date < startDate) return false;
+		if (endDate && date > endDate) return false;
+
+        return true;
+      });
+
+      updateStats(filtered);
+      renderCollisionLayer(filtered);
+      renderVisibleLayers();
+
+      return filtered;
+    }
+
+    function updateStats(filtered) {
+      const total = filtered.length;
+      const species = uniqueSorted(filtered.map(f => f.properties.species_name));
+      const buildingLabels = uniqueSorted(filtered.map(f => getCollisionBuildingLabel(f.properties)));
+      const speciesCounts = countBy(filtered, "species_name", "Unknown species");
+      const topSpecies = topEntries(speciesCounts, 1);
+      const mostCommonSpecies = topSpecies.length ? topSpecies[0][0] : "N/A";
+
+      document.getElementById("stats-panel").innerHTML = `
+        ${statCard("Filtered records", total.toLocaleString())}
+        <div class="two-stat-grid">
+          ${statCard("Unique species", species.length.toLocaleString())}
+          ${statCard("Buildings", buildingLabels.length.toLocaleString())}
+        </div>
+        ${statCard("Most common species", mostCommonSpecies)}
+      `;
+    }
+
+    function renderCollisionLayer(features) {
+      collisionLayer.clearLayers();
 
       features.forEach(feature => {
-        const coordinates = feature.geometry.coordinates;
-        const lon = coordinates[0];
-        const lat = coordinates[1];
-        const properties = feature.properties;
+        const p = feature.properties;
+        const lat = Number(p.lat);
+        const lon = Number(p.lon);
 
-        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-          return;
-        }
+        if (Number.isNaN(lat) || Number.isNaN(lon)) return;
 
         const marker = L.circleMarker([lat, lon], {
-          radius: 5,
-          color: "#011f3e",
-          fillColor: "#e94f37",
+          radius: 4,
+          color: THEME.secondary,
+          fillColor: THEME.danger,
           fillOpacity: 0.75,
           weight: 1
         });
 
-        const species = cleanValue(properties.species_name) || "Unknown species";
-        const status = cleanValue(properties.dead_or_alive) || "Unknown status";
-        const building = getBuildingLabel(properties);
-        const date = cleanValue(properties.time_observed) || "Unknown date";
-
-        marker.bindTooltip(species);
+        marker.bindTooltip(cleanValue(p.species_name, ""));
+        marker.bindPopup(`
+          <strong>${cleanValue(p.species_name, "Unknown species")}</strong><br>
+          <strong>Date:</strong> ${cleanValue(p.time_observed)}<br>
+          <strong>Building:</strong> ${cleanValue(p.building_name)}<br>
+          <strong>Status:</strong> ${cleanValue(p.dead_or_alive)}<br>
+          <strong>Condition:</strong> ${cleanValue(p.condition)}
+        `);
 
         marker.on("click", () => {
-          selectedPanel.innerHTML = `
-            <strong>Species:</strong> ${species}<br>
-            <strong>Status:</strong> ${status}<br>
-            <strong>Building:</strong> ${building}<br>
-            <strong>Date:</strong> ${date}
-          `;
+          updateSelectedCollision(p);
+          updateBuildingStatisticsById(p.building_id);
         });
 
-        marker.addTo(markerLayer);
-        bounds.push([lat, lon]);
+        collisionLayer.addLayer(marker);
       });
+    }
 
-      if (bounds.length > 0) {
-        map.fitBounds(bounds, { padding: [20, 20], maxZoom: 15 });
+    function renderBuildingLayer() {
+      buildingLayer.clearLayers();
+
+      const values = buildings.map(f => Number(f.properties.num_birds_near)).filter(v => !Number.isNaN(v));
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      const breaks = Array.from({ length: 7 }, (_, i) => min + ((max - min) * i / 6));
+
+      buildings.forEach(feature => {
+        const p = feature.properties;
+        const color = getBuildingColor(p.num_birds_near, breaks);
+
+        const layer = L.geoJSON(feature, {
+          style: {
+            color: "black",
+            weight: 0.5,
+            fillColor: color,
+            fillOpacity: 0.8
+          }
+        });
+
+        layer.bindPopup(`
+          <strong>${cleanValue(p.building_name, "Unnamed building")}</strong><br>
+          <strong>Collisions:</strong> ${cleanValue(p.num_birds_near)}<br>
+          <strong>Approx. height (ft):</strong> ${cleanValue(p.approx_hgt)}<br>
+          <strong>Address:</strong> ${cleanValue(p.address)}
+        `);
+
+        layer.on("click", () => updateBuildingStatisticsById(p.building_id || p.gid || p.id));
+
+        buildingLayer.addLayer(layer);
+      });
+    }
+
+    function renderVisibleLayers() {
+      map.removeLayer(collisionLayer);
+      map.removeLayer(buildingLayer);
+
+      if (currentLayerMode === "collisions") collisionLayer.addTo(map);
+      if (currentLayerMode === "buildings") buildingLayer.addTo(map);
+      if (currentLayerMode === "both") {
+        buildingLayer.addTo(map);
+        collisionLayer.addTo(map);
       }
     }
 
-    function updateDashboard() {
-      const filteredFeatures = filterFeatures();
-      updateStats(filteredFeatures);
-      renderMarkers(filteredFeatures);
+    function updateSelectedCollision(p) {
+      document.getElementById("selected-collision-panel").innerHTML = `
+        <div class="detail-title">${cleanValue(p.species_name, "Unknown species")}</div>
+        <div class="detail-row"><strong>Scientific name:</strong> ${cleanValue(p.scientific_name)}</div>
+        <div class="detail-row"><strong>Date observed:</strong> ${cleanValue(p.time_observed)}</div>
+        <div class="detail-row"><strong>Status:</strong> ${cleanValue(p.dead_or_alive)}</div>
+        <div class="detail-row"><strong>Condition:</strong> ${cleanValue(p.condition)}</div>
+        <div class="detail-row"><strong>Building:</strong> ${cleanValue(p.building_name)}</div>
+        <div class="detail-row"><strong>Building side:</strong> ${cleanValue(p.building_side)}</div>
+        <div class="detail-row"><strong>Distance from collision:</strong> ${cleanValue(p.ft_from_collision)}</div>
+        <div class="detail-row"><strong>Approx. building height:</strong> ${cleanValue(p.approx_hgt)}</div>
+        <div class="detail-row"><strong>Address:</strong> ${cleanValue(p.address)}</div>
+        <div class="detail-row"><strong>Reporter:</strong> ${cleanValue(p.user_login)}</div>
+      `;
     }
 
-    speciesFilter.addEventListener("change", updateDashboard);
-    statusFilter.addEventListener("change", updateDashboard);
-    buildingFilter.addEventListener("change", updateDashboard);
-    dateFilter.addEventListener("change", updateDashboard);
+    function getRowsForBuilding(buildingId) {
+      return collisions.filter(f => String(f.properties.building_id) === String(buildingId));
+    }
 
-    clearButton.addEventListener("click", () => {
-      speciesFilter.value = "";
-      statusFilter.value = "";
-      buildingFilter.value = "";
-      dateFilter.value = "";
-      selectedPanel.textContent = "Click a collision point to inspect details.";
-      updateDashboard();
-    });
+    function updateBuildingStatisticsById(buildingId) {
+      const rows = getRowsForBuilding(buildingId);
+      updateBuildingStatistics(rows);
+    }
 
-    fetch("data/bird_reports_sample.geojson")
-      .then(response => {
-        if (!response.ok) {
-          throw new Error("Could not load GeoJSON file.");
-        }
+    function updateBuildingStatistics(rows) {
+      const graphPanel = document.getElementById("graph-panel");
 
-        return response.json();
-      })
-      .then(geojson => {
-        allFeatures = geojson.features || [];
-        initializeFilters(allFeatures);
-        updateDashboard();
-      })
-      .catch(error => {
-        statsPanel.innerHTML = `
-          <div class="stat">
-            <div class="stat-label">Error</div>
-            <div class="stat-value">Data failed to load</div>
-          </div>
-          <p class="muted">${error.message}</p>
-        `;
+      if (!rows.length) {
+        graphPanel.innerHTML = "No collision records found for this building.";
+        return;
+      }
+
+      const p = rows[0].properties;
+      const buildingName = cleanValue(p.building_name, "Unnamed building");
+      const address = cleanValue(p.address);
+
+      graphPanel.innerHTML = `
+        <div class="detail-title">${buildingName}</div>
+        <div class="detail-row"><strong>Address:</strong> ${address}</div>
+        <div id="pie-row" style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:2px;">
+          <div id="outcome-chart" style="height:165px;"></div>
+          <div id="condition-chart" style="height:165px;"></div>
+        </div>
+        <div id="species-chart" style="height:230px;"></div>
+        <div id="ndvi-chart" style="height:220px;"></div>
+      `;
+
+      renderOutcomeChart(rows);
+      renderConditionChart(rows);
+      renderSpeciesChart(rows);
+      renderNDVIChart(p);
+    }
+
+    function renderOutcomeChart(rows) {
+      const dead = rows.filter(f => f.properties.dead_or_alive === "Dead").length;
+      const alive = rows.filter(f => f.properties.dead_or_alive === "Alive").length;
+
+      const labels = [];
+      const values = [];
+      const colors = [];
+
+      if (dead > 0) {
+        labels.push("Dead");
+        values.push(dead);
+        colors.push(THEME.danger);
+      }
+
+      if (alive > 0) {
+        labels.push("Alive");
+        values.push(alive);
+        colors.push(THEME.primary);
+      }
+
+      Plotly.newPlot("outcome-chart", [{
+        type: "pie",
+        labels,
+        values,
+        hole: 0.38,
+        marker: { colors },
+        textinfo: "label+percent+value",
+        hovertemplate: "%{label}: %{value}<extra></extra>"
+      }], {
+        margin: { l: 0, r: 0, t: 34, b: 0 },
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(0,0,0,0)",
+        font: { family: "Poppins, sans-serif", color: THEME.text, size: 11 },
+        title: { text: "Dead / Alive", x: 0.5, xanchor: "center", font: { size: 13 } },
+        showlegend: false,
+        height: 155
+      }, { displayModeBar: false, responsive: true });
+    }
+
+    function renderConditionChart(rows) {
+      const counts = topEntries(countBy(rows, "condition", "Unknown"), 6);
+
+      Plotly.newPlot("condition-chart", [{
+        type: "pie",
+        labels: counts.map(d => d[0]),
+        values: counts.map(d => d[1]),
+        hole: 0.38,
+        marker: { colors: randomPalette(counts.length) },
+        textinfo: "percent",
+        hovertemplate: "%{label}: %{value}<extra></extra>"
+      }], {
+        margin: { l: 0, r: 0, t: 28, b: 0 },
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(0,0,0,0)",
+        font: { family: "Poppins, sans-serif", color: THEME.text, size: 10 },
+        title: { text: "Condition", x: 0.5, xanchor: "center", font: { size: 13 } },
+        showlegend: false,
+        height: 155
+      }, { displayModeBar: false, responsive: true });
+    }
+
+    function renderSpeciesChart(rows) {
+      const counts = topEntries(countBy(rows, "species_name", "Unknown species"), 8).reverse();
+
+      Plotly.newPlot("species-chart", [{
+        type: "bar",
+        x: counts.map(d => d[1]),
+        y: counts.map(d => d[0]),
+        orientation: "h",
+        marker: { color: randomPalette(counts.length) },
+        hovertemplate: "%{y}: %{x}<extra></extra>"
+      }], {
+        margin: { l: 125, r: 10, t: 34, b: 28 },
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(0,0,0,0)",
+        font: { family: "Poppins, sans-serif", color: THEME.text, size: 10 },
+        title: { text: "Species Counts", x: 0.5, xanchor: "center", font: { size: 13 } },
+        xaxis: { title: "Count", showgrid: false, zeroline: false },
+        yaxis: { title: "", automargin: true },
+        height: 230
+      }, { displayModeBar: false, responsive: true });
+    }
+
+    function renderNDVIChart(props) {
+      if (!ndviRows.length) {
+        document.getElementById("ndvi-chart").innerHTML = "<div style='font-size:12px;color:#5c6b7a;'>No NDVI table loaded.</div>";
+        return;
+      }
+
+      let selected = ndviRows.filter(d => String(d.building_id) === String(props.building_id));
+
+      if (!selected.length && props.building_name) {
+        selected = ndviRows.filter(d => String(d.building_name) === String(props.building_name));
+      }
+
+      if (!selected.length) {
+        document.getElementById("ndvi-chart").innerHTML = "<div style='font-size:12px;color:#5c6b7a;'>No NDVI records found for this building.</div>";
+        return;
+      }
+
+      const hasTenMeter = selected.some(d => Number(d.ring_m) === 10);
+      if (hasTenMeter) selected = selected.filter(d => Number(d.ring_m) === 10);
+
+      const seasonOrder = { spring: 1, fall: 2 };
+      selected.sort((a, b) => Number(a.year) - Number(b.year) || seasonOrder[a.season] - seasonOrder[b.season]);
+
+      Plotly.newPlot("ndvi-chart", [{
+        type: "scatter",
+        x: selected.map(d => `${d.year} ${String(d.season).charAt(0).toUpperCase() + String(d.season).slice(1)}`),
+        y: selected.map(d => Number(d.ndvi_mean)),
+        mode: "lines+markers",
+        line: { color: THEME.primary, width: 2 },
+        marker: { size: 6, color: THEME.danger },
+        hovertemplate: "%{x}<br>Mean NDVI: %{y:.3f}<extra></extra>"
+      }], {
+        margin: { l: 38, r: 10, t: 34, b: 55 },
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(0,0,0,0)",
+        font: { family: "Poppins, sans-serif", color: THEME.text, size: 10 },
+        title: { text: "Mean NDVI", x: 0.5, xanchor: "center", font: { size: 13 } },
+        xaxis: { title: "", tickangle: -35, showgrid: false },
+        yaxis: { title: "NDVI", showgrid: false, zeroline: false },
+        height: 210
+      }, { displayModeBar: false, responsive: true });
+    }
+
+    function setupFilters() {
+      fillSelect("species-filter", uniqueSorted(collisions.map(f => f.properties.species_name)), "All species");
+      fillSelect("status-filter", uniqueSorted(collisions.map(f => f.properties.dead_or_alive)), "All statuses");
+      fillSelect("condition-filter", uniqueSorted(collisions.map(f => f.properties.condition)), "All conditions");
+      fillSelect("building-filter", uniqueSorted(collisions.map(f => getCollisionBuildingLabel(f.properties))), "All buildings");
+    }
+
+    function setupListeners() {
+      ["species-filter", "status-filter", "condition-filter", "building-filter", "start-date", "end-date"].forEach(id => {
+        document.getElementById(id).addEventListener("change", () => {
+          const filtered = applyFilters();
+
+          if (id === "building-filter") {
+            const building = document.getElementById("building-filter").value;
+            if (building) {
+              const rows = filtered.filter(f => getCollisionBuildingLabel(f.properties) === building);
+              updateBuildingStatistics(rows);
+            }
+          }
+        });
       });
+
+      document.getElementById("clear-filters").addEventListener("click", () => {
+        ["species-filter", "status-filter", "condition-filter", "building-filter"].forEach(id => document.getElementById(id).value = "");
+        document.getElementById("start-date").value = "";
+		document.getElementById("end-date").value = "";
+        document.getElementById("selected-collision-panel").innerHTML = "Click a collision point to inspect details.";
+        document.getElementById("graph-panel").innerHTML = "Select a building or click a collision point to view building-level outcomes.";
+        applyFilters();
+      });
+
+      document.querySelectorAll("input[name='layer-mode']").forEach(el => {
+        el.addEventListener("change", e => {
+          currentLayerMode = e.target.value;
+          renderVisibleLayers();
+        });
+      });
+
+      document.querySelectorAll("input[name='right-mode']").forEach(el => {
+        el.addEventListener("change", e => {
+          const stats = document.getElementById("building-statistics-view");
+          const cesium = document.getElementById("cesium-view");
+
+          if (e.target.value === "cesium") {
+            stats.classList.add("hidden");
+            cesium.classList.remove("hidden");
+          } else {
+            cesium.classList.add("hidden");
+            stats.classList.remove("hidden");
+          }
+        });
+      });
+    }
+
+    async function init() {
+      const collisionsGeojson = await fetch("data/collisions.geojson").then(r => r.json());
+      const buildingsGeojson = await fetch("data/buildings.geojson").then(r => r.json());
+
+      collisions = collisionsGeojson.features;
+      buildings = buildingsGeojson.features;
+
+      try {
+        const ndviText = await fetch("data/building_season_ndvi.csv").then(r => r.ok ? r.text() : "");
+        ndviRows = ndviText ? d3.csvParse(ndviText) : [];
+      } catch {
+        ndviRows = [];
+      }
+
+      setupFilters();
+      setupListeners();
+      renderBuildingLayer();
+      applyFilters();
+
+      map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+    }
+
+    init();
   </script>
 </body>
 </html>
